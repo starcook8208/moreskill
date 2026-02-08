@@ -1,0 +1,16 @@
+{
+  "stations": [
+    { "stationID": "0990", "stationCode": "NAK", "name": { "zh_tw": "南港", "en": "Nangang" }, "operator": "THSR" },
+    { "stationID": "1000", "stationCode": "TPE", "name": { "zh_tw": "台北", "en": "Taipei" }, "operator": "THSR" },
+    { "stationID": "1010", "stationCode": "BAC", "name": { "zh_tw": "板橋", "en": "Banqiao" }, "operator": "THSR" },
+    { "stationID": "1020", "stationCode": "TAY", "name": { "zh_tw": "桃園", "en": "Taoyuan" }, "operator": "THSR" },
+    { "stationID": "1030", "stationCode": "HSC", "name": { "zh_tw": "新竹", "en": "Hsinchu" }, "operator": "THSR" },
+    { "stationID": "1035", "stationCode": "MIL", "name": { "zh_tw": "苗栗", "en": "Miaoli" }, "operator": "THSR" },
+    { "stationID": "1040", "stationCode": "TAC", "name": { "zh_tw": "台中", "en": "Taichung" }, "operator": "THSR" },
+    { "stationID": "1043", "stationCode": "CHA", "name": { "zh_tw": "彰化", "en": "Changhua" }, "operator": "THSR" },
+    { "stationID": "1047", "stationCode": "YUL", "name": { "zh_tw": "雲林", "en": "Yunlin" }, "operator": "THSR" },
+    { "stationID": "1050", "stationCode": "CHY", "name": { "zh_tw": "嘉義", "en": "Chiayi" }, "operator": "THSR" },
+    { "stationID": "1060", "stationCode": "TNN", "name": { "zh_tw": "台南", "en": "Tainan" }, "operator": "THSR" },
+    { "stationID": "1070", "stationCode": "ZUY", "name": { "zh_tw": "左營", "en": "Zuoying" }, "operator": "THSR" }
+  ]
+}
