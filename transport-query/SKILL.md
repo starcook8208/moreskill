@@ -169,7 +169,7 @@ https://tdx.transportdata.tw/api/basic/v2/Rail/THSR/DailyTimetable/OD/1040/to/10
 
 ---
 
-## Resources
+## references
 
 | 檔案 | 位置 | 說明 |
 |------|------|------|
