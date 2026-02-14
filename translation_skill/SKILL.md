@@ -27,24 +27,22 @@ allowed-tools: ["Bash"]
 
 ### 自動偵測來源語言
 ```bash
-curl -X POST "https://translation.googleapis.com/language/translate/v2" \
+curl -X POST "https://translation.googleapis.com/language/translate/v2?key=$Trans_key" \
   -H "Content-Type: application/json" \
   -d '{
     "q": "要翻譯的文字",
-    "target": "zh-TW",
-    "key": "'"$Trans_key"'"
+    "target": "zh-TW"
   }'
 ```
 
 ### 指定來源語言
 ```bash
-curl -X POST "https://translation.googleapis.com/language/translate/v2" \
+curl -X POST "https://translation.googleapis.com/language/translate/v2?key=$Trans_key" \
   -H "Content-Type: application/json" \
   -d '{
     "q": "Hello world",
     "source": "en",
-    "target": "ja",
-    "key": "'"$Trans_key"'"
+    "target": "ja"
   }'
 ```
 
