@@ -8,9 +8,7 @@ allowed-tools: ["browser"]
 # Uber Eats 訂餐技能
 
 ## 配送資訊（預設）
-- **地址**：彰化縣鹿港鎮景福巷18號
-- **用戶**：黃 (open8208@gmail.com)
-- **付款方式**：現金
+
 
 ---
 
