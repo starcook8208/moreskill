@@ -303,7 +303,7 @@ function filterAndSortRestaurants(restaurants, routePolyline) {
 
 **內網 URL**：
 ```
-POST http://tdx-filter-service.zeabur.internal:8080/traffic/route-analysis
+POST http://tdx-filter-service-fral.zeabur.internal:8080/traffic/route-analysis
 ```
 
 **請求格式**：
