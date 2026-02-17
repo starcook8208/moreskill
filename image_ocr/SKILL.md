@@ -1,103 +1,67 @@
 ---
-name: 圖片 OCR 與 AI 智慧整理
-description: 透過 Google Vision API 擷取圖片文字，並利用 LLM 根據需求進行歸納整理。
+name: image-ocr
+description: 使用 Google Vision API 進行圖片文字辨識（OCR），支援一般文字與手寫辨識。當使用者需要： (1) 從圖片擷取文字 (2) 辨識手寫內容 (3) 圖片轉文字 (4) 照片文字提取 時使用此技能。
 ---
 
-# 圖片 OCR 與 AI 智慧整理 Skill
+# 圖片 OCR 技能
 
-## 用途
-當用戶上傳圖片（如菜單、收據、筆記、文件）並要求整理、分析或翻譯時，使用此 Skill。
+使用 Google Vision API v1p4beta1 進行圖片文字辨識，支援手寫辨識。
 
-## 核心流程
+## 基本 OCR
 
-### 1. 檢測圖片輸入
-當用戶訊息中包含圖片附件時，觸發此 Skill。
-
-### 2. 呼叫 Google Cloud Vision API
-使用 `TEXT_DETECTION` 功能獲取圖片中的所有文字。
-
-**Endpoint**:
+```javascript
+const response = await fetch(
+  `https://vision.googleapis.com/v1p4beta1/images:annotate?key=${process.env.GOOGLE_VISION_API_KEY}`,
+  {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      requests: [{
+        image: { source: { imageUri: '圖片網址' } },
+        // 或 Base64: image: { content: 'BASE64_STRING' }
+        features: [{ type: 'TEXT_DETECTION' }]
+      }]
+    })
+  }
+);
 ```
-POST https://vision.googleapis.com/v1/images:annotate
-```
 
-**Headers**:
-```
-Content-Type: application/json
-```
+## 手寫辨識（使用新版 Beta）
 
-**請求格式**:
-```json
-{
-  "requests": [
-    {
-      "image": {
-        "content": "BASE64_ENCODED_IMAGE_DATA"
-      },
-      "features": [
-        {
-          "type": "TEXT_DETECTION"
+```javascript
+const response = await fetch(
+  `https://vision.googleapis.com/v1p4beta1/images:annotate?key=${process.env.GOOGLE_VISION_API_KEY}`,
+  {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      requests: [{
+        image: { source: { imageUri: '圖片網址' } },
+        features: [{ type: 'DOCUMENT_TEXT_DETECTION' }],
+        imageContext: {
+          languageHints: ['zh-TW', 'en', 'en-t-i0-handwrit']  // 手寫辨識
         }
-      ]
-    }
-  ]
-}
+      }]
+    })
+  }
+);
 ```
 
-**環境變數**:
-- 使用系統環境變數中的 `GOOGLE_VISION_API_KEY`。
-- 請求 URL 將變更為：`https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_VISION_API_KEY}`
+## 參數說明
 
-### 3. 文字提取與清理
-從 API 回傳的 `textAnnotations[0].description` 中提取完整原始文字。
+| 參數 | 必填 | 說明 |
+|------|------|------|
+| `image.source.imageUri` | ✓ | 圖片公開網址 |
+| `image.content` | ✓ | Base64 編碼 (二選一) |
+| `features.type` | ✓ | `TEXT_DETECTION` 一般文字<br>`DOCUMENT_TEXT_DETECTION` 文件/手寫 |
+| `imageContext.languageHints` | 否 | 語言提示：<br>`zh-TW` 中文<br>`en` 英文<br>`en-t-i0-handwrit` 手寫 |
 
-### 4. LLM 處理邏輯
-將提取出的原始文字連同用戶的原始需求發送給 LLM。
+## 回傳取得文字
 
-**內部提示詞邏輯**:
-> 「以下是從圖片中辨識出的文字內容：
-> [原始文字內容]
-> 
-> 請根據用戶的要求：'[用戶原始需求]'
-> 對上述內容進行專業、精簡且有條理的整理。如果是菜單請列表，如果是收據請總結金額，如果是文件請概述重點。」
-
-### 5. 格式化輸出
-
-根據辨識內容，輸出易於閱讀的格式（文字表格 markdown、列表或摘要）。
-
----
-
-## 預期輸出範例
-
-### 情境 A：整理菜單
-**用戶輸入**：(上傳菜單圖)「幫我整理這張菜單的熱門推薦」
-**輸出**：
+```javascript
+const result = await response.json();
+const text = result.responses[0].textAnnotations[0].description;
 ```
-🍴 餐廳菜單整理結果
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🌟 熱門推薦項目：
-1. 招牌紅燒牛肉麵 - $180
-2. 特製手工水餃 (10顆) - $80
-3. 涼拌小黃瓜 - $40
 
-💡 備註：圖片辨識顯示目前有提供套餐優惠，加 50 元升級 A 套餐。
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
-### 5. 格式化輸出
-
-根據辨識內容，輸出易於閱讀的格式（Markdown 表格、列表或摘要）。
-
----
-
-## 錯誤處理
-
-| 錯誤情境 | 處理方式 |
-|----------|----------|
-| 圖片模糊無法辨識 | 提示用戶「圖片辨識度較低，請嘗試提供更清晰的圖片」 |
-| 未設定 API Key | 提示用戶「系統尚未配置 Vision API Key，請檢查環境變數」 |
-| 超過 Google API 配額 | 告知用戶「今日辨識次數已達上限，請稍後再試」 |
-| 無任何文字內容 | 告知用戶「此圖片中未偵測到明顯文字」 |
-
-## 安全與隱私說明
-- 圖片資料僅用於呼叫 Vision API 進行一次性辨識。
-- 辨識後的文字會交由 LLM 處理，請注意不要上傳包含個人極敏感資訊（如明文密碼）的圖片。
+## 環境變數
+- `GOOGLE_VISION_API_KEY` - Google Vision API 金鑰
