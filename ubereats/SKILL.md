@@ -1,12 +1,15 @@
 ---
 name: ubereats
 description: Uber Eats 訂餐技能。自動完成登入、選餐、結帳流程。根據指定座標搜尋附近餐廳。支援動態搜尋與餐點客製化。
-version: 4.0.0
-allowed-tools: ["browser"]
 ---
 
-# ⚠️ 重要：必ず使用 Host Browser
-**每次操作瀏覽器時都必須指定 `target="host"`，否則會找不到用戶已登入的頁面！**
+> Metadata
+> - version: 4.0.1
+> - allowed-tools: ["browser"]
+
+
+# ⚠️ 重要：必須使用 OpenClaw Browser
+**每次操作瀏覽器時都必須使用 `profile="openclaw"`，这样可以直接使用 OpenClaw 自身的瀏覽器，不需要額外連接 Chrome 擴充！**
 
 ---
 
@@ -569,19 +572,19 @@ browser({ action: "act", request: { kind: "click", ref: "[動態ref]" }});
 ### 瀏覽器啟動流程（重要！）
 當需要使用瀏覽器時，按照以下順序嘗試：
 
-1. **先嘗試直接操作**：使用 `target="host"` 嘗試操作瀏覽器
-2. **如果失敗**，嘗試啟動 OpenClaw 瀏覽器：
+1. **直接使用 OpenClaw 瀏覽器**：使用 `profile="openclaw"` 
+2. **如果瀏覽器未啟動**，嘗試啟動：
    ```json
    { "action": "start", "profile": "openclaw" }
    ```
-3. **如果瀏覽器已開啟但無法連線**，嘗試連線：
+3. **然後導航到 Uber Eats**：
    ```json
    { "action": "open", "profile": "openclaw", "targetUrl": "https://www.ubereats.com/tw/feed" }
    ```
 
-### 預設使用 Host Browser
-- 使用 `target="host"` 或 `targetUrl` 直接操作
-- **不要**使用 `profile="openclaw"` 或 `profile="chrome"`
+### 預設使用 OpenClaw Browser
+- 使用 `profile="openclaw"` 或 `targetUrl` 直接操作
+- **不要**使用 `target="host"` 或 `profile="chrome"`
 - 保持登入狀態，不用每次重新登入
 
 ### 瀏覽器已開啟
@@ -589,9 +592,8 @@ browser({ action: "act", request: { kind: "click", ref: "[動態ref]" }});
 - Session 維持登入中
 
 ### ⚠️ 不要顯示錯誤訊息
-- **不要**在瀏覽器無法連線時顯示長串的錯誤說明
-- **直接嘗試啟動**�覽器，不要詢問用戶如何處理
-- 如果瀏覽器服務确实未啟用，嘗試用 `openclaw gateway restart` 或自動啟動瀏覽器
+- **直接使用 OpenClaw 瀏覽器** - 不需要詢問用戶如何處理
+- 如果瀏覽器服務未啟用，自動嘗試啟動瀏覽器
 
 ---
 
