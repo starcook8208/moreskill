@@ -1,698 +1,529 @@
 ---
 name: ubereats
-description: Uber Eats 訂餐技能。自動完成登入、選餐、結帳流程。根據指定座標搜尋附近餐廳。支援動態搜尋與餐點客製化。
----
-
-> Metadata
-> - version: 4.0.1
-> - allowed-tools: ["browser"]
-
-
-# ⚠️ 重要：必須使用 OpenClaw Browser
-**每次操作瀏覽器時都必須使用 `profile="openclaw"`，这样可以直接使用 OpenClaw 自身的瀏覽器，不需要額外連接 Chrome 擴充！**
-
----
-
-# 输出规格
-
-## 店家列表输出格式
-
-查询附近店家时，请按以下规格输出：
-
-```
-| ref | 店家名 | 活動 |
-|-----|--------|------|
-| e520 | 春和茶水攤 鹿港店 | 買1送1 |
-| e517 | 李珍心綠豆沙專門店（鹿港店） | 買1送1 |
-```
-
-## 餐点列表输出格式
-
-查询店家餐点时，请按以下规格输出：
-
-```
-| ref | 餐點名稱 | 價格 |
-|-----|----------|------|
-| e31 | 黑糖珍珠奶茶 | $70 |
-| e33 | 芒果绿茶 | $65 |
-```
-
+description: Uber Eats 訂餐技能。自動完成登入、選餐、結帳流程。
+version: 4.6
 ---
 
 # Uber Eats 訂餐技能
 
-## 配送資訊（預設）
+## ⚠️ 必要工具
+- **瀏覽器**: 必須使用 `profile="openclaw"`
+- **每次操作後**: 必須執行 snapshot 確認當前頁面 ref
 
 ---
 
-# 🔍 模糊搜尋腳本
-
-每次搜尋店家或餐點後，**必須使用 snapshot 擷取頁面**：
-
-```bash
-snapshot --selector "main" --interactive --limit 20
-```
-
-## 快速搜尋函數
-
-## 引入腳本
-
-```javascript
-const { 搜尋, 搜尋餐點, 搜尋按鈕, 搜尋購物車, 搜尋結帳 } = require('./search.js');
-```
-
-## 快速搜尋函數
-
-| 函數 | 用法 | 範例 |
-|------|------|------|
-| `搜尋(snapshot, 關鍵字)` | 模糊搜尋任何元素 | `搜尋(snapshot, '醋肉')` |
-| `搜尋餐點(snapshot, 餐點名稱)` | 搜尋餐點 link | `搜尋餐點(snapshot, '燒肉飯')` |
-| `搜尋按鈕(snapshot, 按鈕名稱)` | 搜尋按鈕 | `搜尋按鈕(snapshot, '新增')` |
-| `搜尋購物車(snapshot)` | 找購物車按鈕 | `搜尋購物車(snapshot)` |
-| `搜尋結帳(snapshot)` | 找結帳按鈕 | `搜尋結帳(snapshot)` |
-| `搜尋快速新增(snapshot)` | 找快速新增按鈕 | `搜尋快速新增(snapshot)` |
-
-## 搜尋結果格式
-
-```javascript
-[
-  { ref: 'e20', content: '小份醋肉 $63', type: 'link', line: 10 },
-  { ref: 'e34', content: '小份醋肉 $63 ...', type: 'link', line: 34 }
-]
-```
-
-## 使用範例
-
-```javascript
-// Step 1: 先 snapshot
-snapshot --selector "main" --interactive --limit 20
-
-// Step 2: 用搜尋腳本找餐點
-const results = 搜尋餐點(snapshotOutput, '醋肉');
-// 回傳: [{ ref: 'e20', content: '小份醋肉 $63', ... }]
-
-// Step 3: 直接點擊
-act click ref: e20
-```
-
-## 懶人捷徑
-
-| 需求 | 搜尋 |
-|------|------|
-| 找購物車 | `搜尋(snapshot, '購物車')` |
-| 找結帳 | `搜尋(snapshot, '結帳')` |
-| 找某餐點 | `搜尋(snapshot, '餐點名稱')` |
-| 找快速新增 | `搜尋(snapshot, '快速新增')` |
-
----
-
-# 🚀 自動化搜尋流程（重要！）
-
-每次執行 snapshot 後，**自動用搜尋腳本**找目標 ref！
-
-## 自動化流程
+## 📋 完整訂餐流程（6 步）
 
 ```
-Step 1: 用戶說「我要結帳」
-   ↓
-Step 2: snapshot --interactive --limit 20
-   ↓
-Step 3: 搜尋腳本自動執行
-   ↓
-Step 4: 回傳符合的 ref
-   ↓
-Step 5: 直接點擊
-```
-
-## 搜尋腳本自動執行
-
-根據用戶需求，自動搜尋：
-
-| 用戶需求 | 搜尋關鍵字 | 範例 |
-|---------|------------|------|
-| 結帳 | `搜尋(snapshot, '結帳')` | e194 |
-| 購物車 | `搜尋(snapshot, '購物車')` | e6 |
-| 找餐點 | `搜尋(snapshot, '餐點名稱')` | e20, e35... |
-| 快速新增 | `搜尋(snapshot, '快速新增')` | e21, e24... |
-| 分類 | `搜尋(snapshot, '分類名')` | e6, e7... |
-
-## 搜尋優先順序
-
-1. **結帳** → 搜「結帳」「前往結帳」
-2. **購物車** → 搜「購物車」
-3. **選餐點** → 搜用戶說的餐點名稱
-4. **選分類** → 搜分類名稱
-5. **快速新增** → 搜「快速新增」
-
-## 使用範例
-
-```javascript
-// 用戶說：我要結帳
-// 自動執行：
-snapshot --interactive --limit 20
-const results = 搜尋(snapshotOutput, '結帳')
-// 回傳：[{ ref: 'e194', content: '前往結帳', ... }]
-// 自動點擊：e194
+Step 1: 確認需求
+Step 2: 變更配送地址（如需要）
+Step 3: 搜尋餐廳
+Step 4: 選擇餐點
+Step 5: 查看購物車
+Step 6: 結帳
 ```
 
 ---
 
-# ⚠️ 重要：Ref 動態變化原則
+## Step 1: 確認需求
 
-**每次頁面導航或載入後，ref 都會重新編排！**
+### 觸發關鍵字
+| 關鍵字 | 範例 |
+|--------|------|
+| ubereats / 外送 | 「幫我叫外送」「Uber Eats」 |
+| 配送地址 | 「配送地址 彰化市中山路150號」 |
+| 搜尋餐點 | 「我想吃珍珠奶茶」「附近有什麼」 |
 
-### 錯誤做法（會失敗）
-1. 假設之前的 ref 仍然有效
-2. 直接點擊 e7（但頁面已變，ref 已過期）
+### 🔑 餐點類型代號（重要！）
+| 用戶說的 | 實際搜尋 | 分類 Ref |
+|----------|----------|----------|
+| 飲料店 / 手搖飲 | 「珍珠奶茶」分類 | `e33` |
+| 早餐 | 「早餐」分類 | `e21` |
+| 甜點 | 「甜點」分類 | `e22` |
+| 速食 | 「速食」分類 | `e23` |
+| 中式美食 | 「中式美食」分類 | `e25` |
+| 台灣美食 | 「台灣美食」分類 | `e26` |
+| 珍珠奶茶 | 直接搜尋「珍珠奶茶」 | - |
 
-### 正確做法
+### 快速搜尋飲料店範例
 ```javascript
-// Step 1: 先 snapshot 確認當前頁面結構（互動模式，更精準）
-snapshot --selector "main" --interactive --limit 20
-
-// Step 2: 確認 ref 存在後再操作
-act click ref: e7
+// 用戶說：配送地址 XXX 附近的飲料店
+// Step 1: 先變更地址（參考 Step 2）
+// Step 2: 直接點擊珍珠奶茶分類
+{ "action": "act", "request": { "kind": "click", "ref": "e33" }}
 ```
 
-### 常見錯誤情境
-| 情境 | 問題 | 解決方案 |
-|------|------|----------|
-| 頁面跳轉後直接點擊 | ref 無效 | 先 snapshot |
-| navigate 後操作 | ref 重新編排 | 先 snapshot |
-| 進入新餐廳 | 餐點 ref 變了 | 先 snapshot 菜單 |
-
----
-
-## 標準訂餐流程 (Ref 對照)
-
-### Step 1: 確認需求
-- 對話確認地址、想吃什麼
+### 操作
 - **不需要 snapshot**
-
-### Step 2: 切換配送模式
-- 點擊 e4 (外送) 或 e5 (外帶)
-- **不需要 snapshot**
-
-### Step 3: 搜尋餐廳 + 選擇餐廳
-- 先 snapshot 確認頁面：`--interactive --limit 20`
-- 點擊 e7 搜尋框 → 輸入關鍵字
-- **snapshot 優化（互動模式）**：
-```json
-{ "action": "snapshot", "compact": true, "selector": "main", "interactive": true, "limit": 20 }
-```
-- 從結果直接點擊餐廳 ref 進入
-
-### Step 4: 進入菜單頁
-- 先 snapshot 確認頁面：`--interactive --limit 20`
-- **snapshot 優化（互動模式）**：
-```json
-{ "action": "snapshot", "compact": true, "selector": "main", "interactive": true, "limit": 20 }
-```
-
-### Step 5: 選擇餐點
-
-**餐點項目 Ref**: 每個餐點都是一個 link，點擊會打開客製化 modal。
-- 餐點 ref 從分類區塊後遞增（如 `e27`, `e31`...）
-- 每個餐點會顯示：
-  - 商品名稱
-  - 價格
-  - 評分（如有）
-  - 標籤（如「熱門」「買 1 送 1」「含咖啡因」）
-
-**餐點結構範例** (從 snapshot 取得):
-```
-e31: 🐔海南嫩雞餐盒🏆 $200 • 96% (1568)
-e33: 泰式椒麻雞肉飯餐盒 $235 • 95% (491)
-```
-
-**操作**: `act click ref: e31` (打開餐點客製化頁面)
+- 對話確認：用戶想吃什麼？配送地址在哪？
+- 根據上表轉換成對應的搜尋關鍵字
 
 ---
 
-### Step 6: 進入店家菜單頁
+## Step 2: 變更配送地址（如需要）
 
-點擊餐廳卡片後會進入該店家的菜單頁面。
-
-**頁面關鍵元素**:
-- **搜尋框**: `combobox "搜尋 [店名]"` (ref 如 `e10`)
-- **購物車**: `button "X 台購物車"` (ref 如 `e6`)
-- **配送模式切換**: 外送/自取 (ref 如 `e24`/`e25`)
-
-**菜單分類導航**: 每間店的分類不同，ref 從 `e13` 開始遞增。
-- 例如志氣海南雞飯：
-  - `e13`: 精選商品
-  - `e14`: 訂購指定商品即享優惠
-  - `e15`: 您專屬的推薦商品
-  - `e16` ~ `e22`: 其他分類
-
-**操作**: `act click ref: e13` (進入精選商品分類)
+### 流程判斷
+| 狀況 | 處理方式 |
+|------|----------|
+| 地址已在「已儲存的地址」清單中 | 直接點擊選擇 → 跳過 Step 2.3 |
+| 陌生地址 | 完整流程（Step 2.1 ~ 2.5） |
 
 ---
 
-### Step 7: 選擇餐點
+### Step 2.1: 打開地址對話框
+```javascript
+// 點擊配送地址欄位
+{ "action": "act", "request": { "kind": "click", "ref": "e6" }}
 
-**餐點項目 Ref**: 每個餐點都是一個 link，點擊會打開客製化 modal。
-- 餐點 ref 從分類區塊後遞增（如 `e31`, `e33`, `e35`...）
-- 每個餐點會顯示：
-  - 商品名稱
-  - 價格
-  - 評分（如有）
-  - 標籤（如「熱門」「買 1 送 1」「含咖啡因」）
-
-**餐點結構範例** (從 snapshot 取得):
-```
-e31: 🐔海南嫩雞餐盒🏆 $200 - 排名第 1 多的按讚數
-e33: 泰式椒麻雞肉飯餐盒 $235 • 95% (491)
-e35: 志氣雞飯餐盒 $180 • 97% (665)
-```
-
-**操作**: `act click ref: e31` (打開餐點客製化頁面)
-
----
-
-### Step 8: 客製化餐點
-
-點擊餐點後會彈出 modal，顯示客製化選項：
-- 尺寸（如「中杯」「大杯」）
-- 甜度（如「正常」「微糖」「半糖」「微微糖」「無糖」）
-- 冰塊（如「正常冰」「微冰」「去冰」）
-- 加料（如「加珍珠 +$10」）
-
-**底部按鈕**: `button "新增 X 項商品至訂單・$XX.XX"` - 這是加入購物車的按鈕
-- Ref 需要在 modal snapshot 中找到
-- **⚠️ Modal 元素會動態變化，建議在點擊餐點後立即 snapshot 抓取 ref**
-
-**操作**:
-```json
-{ "action": "act", "request": {"kind": "click", "ref": "[加入購物車按鈕的ref]"} }
+// Snapshot 確認對話框打開
+{ "action": "snapshot", "compact": true, "limit": 15 }
 ```
 
 ---
 
-### Step 9: 查看購物車
+### Step 2.2: 檢查已儲存的地址（快速路徑）
 
-**Ref**: `button "X 台購物車"` (如 `e6`)
-- 顯示在頁面右上角或底部
-- 數字代表購物車內的項目數量
+**從 snapshot 結果中找已儲存的地址**：
+```
+dialog "dialog":
+  - combobox "搜尋地址" [ref=e888]
+  - heading "已儲存的地址"
+    - button "員林影城" [ref=e890]
+    - button "景福巷18號" [ref=e892]
+    - button "中山路二段150號" [ref=e894]
+    ...
+```
 
-**操作**: `act click ref: e6` (打開購物車)
+**如果目標地址在清單中** → 直接點擊選擇：
+```javascript
+{ "action": "act", "request": { "kind": "click", "ref": "e890" }}
+```
+→ 跳過後續步驟，直接完成！
 
 ---
 
-### Step 10: 購物車頁面
+### Step 2.3: 輸入陌生地址（完整流程）
 
-進入購物車後會顯示：
-- 已選餐點列表
-- 每個餐點的客製化選項
-- 小計金額
-- 新增訂單備註按鈕
-- 前往結帳按鈕
+**使用 search.js 快速找到輸入框**：
+```javascript
+// Snapshot 後，用以下方式過濾：
+const 輸入框 = snapshot.filter(item => item.type === 'combobox');
+// 回傳: [{ ref: 'e888', content: '搜尋地址', type: 'combobox' }, ...]
 
-**關鍵元素** (ref 需從購物車 snapshot 取得):
-- 前往結帳按鈕
+// 使用輸入框 ref
+const inputRef = 輸入框[0].ref;  // e888
+```
 
-**操作**:
-```json
-{ "action": "act", "request": {"kind": "click", "ref": "[結帳按鈕ref]"} }
+**操作指令**：
+```javascript
+// 1. 點擊輸入框
+{ "action": "act", "request": { "kind": "click", "ref": "e888" }}
+
+// 2. 輸入地址
+{ "action": "act", "request": { "kind": "type", "ref": "e888", "text": "台中市政府" }}
+
+// 3. 按 Enter
+{ "action": "act", "request": { "key": "Enter", "kind": "press", "ref": "e888" }}
+
+// 4. Snapshot 確認搜尋結果
+{ "action": "snapshot", "compact": true, "limit": 20 }
 ```
 
 ---
 
-### Step 11: 結帳頁面
+### Step 2.4: 選擇搜尋結果
 
-結帳頁面包含：
-- 配送地址確認
-- 付款方式選擇
-- 訂單摘要
-- 下單按鈕
+**從 snapshot 結果中找地址**：
+```
+- heading "5 筆「台中市政府」的搜尋結果"
+  - link "台中市政府" [ref=eXXX]
+  - link "台中市...
+```
+
+**Uber Eats 搜尋結果已按相關性排序** → 第一個通常就是目標：
+```javascript
+// 點擊第一個搜尋結果
+{ "action": "act", "request": { "kind": "click", "ref": "[第一個結果ref]" }}
+```
 
 ---
 
-### Step 12: 追蹤訂單
+### Step 2.5: 建築類型選擇 → 儲存
 
-下單後會跳轉到訂單追蹤頁面。
+**如果出現「選擇你的建築類型」對話框**：
+```
+- dialog:
+  - heading "選擇你的建築類型"
+  - button "跳過" [ref=e772]  // 通常是這個 ref
+  - button "公寓" [ref=eXXX]
+  - button "透天" [ref=eXXX]
+```
+
+```javascript
+// 點擊「跳過」
+{ "action": "act", "request": { "kind": "click", "ref": "e772" }}
+
+// Snapshot 確認
+{ "action": "snapshot", "compact": true, "limit": 15 }
+```
+
+**然後會出現「儲存」按鈕**：
+```
+- button "儲存" [ref=e780]
+```
+
+```javascript
+// 點擊「儲存」
+{ "action": "act", "request": { "kind": "click", "ref": "e780" }}
+```
 
 ---
 
-## 🚀 優化後訂餐流程
-
-### Step 1: 確認需求
-- 對話確認地址、想吃什麼
-- **不需要 snapshot**
-
-### Step 2: 切換配送模式
-- 點擊 e4 (外送) 或 e5 (外帶)
-- **不需要 snapshot**
-
-### Step 3: 搜尋餐廳 + 選擇餐廳
-- 點擊 e7 搜尋框 → 輸入關鍵字
-- **snapshot 優化**：
-```json
-{ "action": "snapshot", "compact": true, "selector": "main", "limit": 30 }
-```
-- 從結果直接點擊餐廳 ref 進入
-
-### Step 4: 進入菜單頁
-- **snapshot 優化**：
-```json
-{ "action": "snapshot", "compact": true, "selector": "main", "interactive": true, "limit": 50 }
-```
-
-### Step 5: 選擇餐點
-- 點擊餐點 → snapshot modal → 點擊加入購物車
-
-### Step 6: 查看購物車
-- 點擊 e1074
-
-### Step 7: 購物車頁面
-- **snapshot 優化**：
-```json
-{ "action": "snapshot", "compact": true, "selector": "main", "limit": 30 }
-```
-
-### Step 8: 結帳
-- 確認地址/付款 → 下單
+### ⚠️ 重要：無結果時回報用戶
+- 輸入地址按 Enter 後
+- 如果顯示「找不到這個地址」→ **回報用戶，請用戶提供其他地址**
 
 ---
 
-## 🎯 Ref 規律總結
+### 📋 優化版地址變更流程（總結）
 
-根據已收集的 snapshots，Uber Eats 的 ref 分配規律：
+```
+打開地址對話框 (e6) 
+    ↓
+Snapshot 確認
+    ↓
+檢查已儲存地址 ← 直接點擊 (如果存在)
+    ↓
+否：輸入新地址 (e888) + Enter
+    ↓
+Snapshot 確認搜尋結果
+    ↓
+選擇搜尋結果 (第一個)
+    ↓
+跳過建築類型 (e772) → 儲存 (e780)
+    ↓
+完成！
+```
+
+---
+
+### 🔑 關鍵 Ref 速查（地址對話框）
+
+| Ref | 元素 | 說明 |
+|-----|------|------|
+| `e6` | link | 配送地址欄位 |
+| `e888` | combobox | 搜尋地址輸入框 |
+| `e890` | button | 已儲存地址（倒數第一個）|
+| `e898` | button | 已儲存地址（倒數範例）|
+| `e772` | button | 「跳過」按鈕 |
+| `e780` | button | 「儲存」按鈕 |
+| `e902` | button | Close 關閉按鈕 |
+
+---
+
+### 🛠️ 使用 search.js 快速定位
+
+```javascript
+// 引入搜尋函數
+const { 搜尋 } = require('./search.js');
+
+// 找輸入框
+const 輸入框 = snapshot.filter(item => item.type === 'combobox');
+console.log(輸入框);  // [{ref: 'e888', content: '搜尋地址', ...}]
+
+// 找已儲存地址
+const 儲存地址 = 搜尋(snapshot, '員林影城');
+// 回傳: [{ref: 'e890', content: '員林影城', ...}]
+
+// 找按鈕
+const 跳過 = 搜尋(snapshot, '跳過');
+const 儲存 = 搜尋(snapshot, '儲存');
+```
+
+---
+
+## Step 3: 搜尋餐廳
+
+### 流程
+```
+點擊搜尋框 → 輸入關鍵字 → snapshot 確認結果 → 點擊餐廳進入
+```
+
+### 關鍵 Ref
+| Ref | 元素 | 說明 |
+|-----|------|------|
+| `e7` | combobox | 搜尋框 |
+| `e4` | radio | 外送模式 |
+| `e5` | radio | 外帶模式 |
+
+### 操作指令
+```javascript
+// 點擊搜尋框
+{ "action": "act", "request": { "kind": "click", "ref": "e7" }}
+
+// 輸入搜尋關鍵字
+{ "action": "act", "request": { "kind": "type", "ref": "e7", "text": "珍珠奶茶" }}
+
+// snapshot 確認結果（務必執行！）
+{ "action": "snapshot", "compact": true, "selector": "main", "limit": 30 }}
+
+// 點擊餐廳（ref 從 snapshot 取得）
+{ "action": "act", "request": { "kind": "click", "ref": "[餐廳ref]" }}
+```
+
+### 輸出格式
+```
+| ref | 店家名 | 活動 |
+|-----|--------|------|
+| e520 | 春和茶水攤 | 買1送1 |
+```
+
+### ⚠️ 重要：必須使用模糊查詢 JS
+> **不要人工看 snapshot 結果找 ref！**
+> 
+> **務必使用 `search.js` 中的函數自動找 ref：**
+> ```javascript
+> const { 搜尋 } = require('./search.js');
+> 
+> // 搜尋餐廳
+> const results = 搜尋(snapshot, '珍珠奶茶');
+> // 回傳: [{ ref: 'e520', content: '春和茶水攤 買1送1', ... }]
+> 
+> // 直接使用搜尋結果的 ref
+> act click ref: results[0].ref
+> ```
+
+---
+
+## Step 4: 選擇餐點
+
+### 流程
+```
+snapshot 確認菜單 → 點擊餐點 → snapshot 確認 modal → 點擊加入購物車
+```
+
+### 關鍵 Ref（店家頁面）
+| Ref | 元素 | 說明 |
+|-----|------|------|
+| `e1074` | button | 購物車 |
+| `e13~` | link | 菜單分類 |
+| `e31~` | link | 餐點項目 |
+
+### 操作指令
+```javascript
+// snapshot 確認菜單
+{ "action": "snapshot", "compact": true, "selector": "main", "limit": 50 }}
+
+// 點擊餐點
+{ "action": "act", "request": { "kind": "click", "ref": "[餐點ref]" }}
+
+// snapshot 確認 modal
+{ "action": "snapshot", "compact": true }}
+
+// 點擊加入購物車（ref 從 modal snapshot 取得）
+{ "action": "act", "request": { "kind": "click", "ref": "[加入購物車ref]" }}
+```
+
+### 餐點輸出格式
+```
+| ref | 餐點名稱 | 價格 |
+|-----|----------|------|
+| e31 | 黑糖珍珠奶茶 | $70 |
+```
+
+### ⚠️ 重要：必須使用模糊查詢 JS
+> **不要人工看 snapshot 結果找 ref！**
+> 
+> **務必使用 `search.js` 中的函數自動找 ref：**
+> ```javascript
+> const { 搜尋餐點, 搜尋 } = require('./search.js');
+> 
+> // 搜尋餐點
+> const results = 搜尋餐點(snapshot, '黑糖珍珠奶茶');
+> // 回傳: [{ ref: 'e31', content: '黑糖珍珠奶茶 $70', ... }]
+> 
+> // 直接使用搜尋結果的 ref
+> act click ref: results[0].ref
+> ```
+
+---
+
+## Step 5: 查看購物車
+
+### 流程
+```
+點擊購物車 → snapshot 確認內容 → 點擊結帳
+```
+
+### 關鍵 Ref
+| Ref | 元素 | 說明 |
+|-----|------|------|
+| `e6` / `e8` | button | 首頁購物車 |
+| `e1074` | button | 店家頁購物車 |
+| `e194` | button | 結帳按鈕 |
+
+### 操作指令
+```javascript
+// 點擊購物車
+{ "action": "act", "request": { "kind": "click", "ref": "e1074" }}
+
+// snapshot 確認內容
+{ "action": "snapshot", "compact": true, "selector": "main", "limit": 30 }}
+
+// 點擊結帳
+{ "action": "act", "request": { "kind": "click", "ref": "e194" }}
+```
+
+---
+
+## Step 6: 結帳
+
+### 流程
+```
+確認配送地址 → 選擇付款方式 → 確認訂單 → 下單
+```
+
+### 操作
+- snapshot 確認當前頁面
+- 依序點擊確認
+- 最後點擊「下單」按鈕
+
+---
+
+## 🔑 黃金法則
+
+### 1. 必須使用模糊查詢 JS（最重要！）
+> **每次搜尋餐廳或餐點時，必須使用 `search.js` 自動找 ref！**
+> 
+> | 人工判斷 ❌ | 模糊查詢 JS ✅ |
+> |-----------|---------------|
+> | ref 可能變化 | 動態抓取最新 ref |
+> | 可能看錯 | 精準匹配 |
+> | 浪費時間 | 自動化 |
+> 
+> **務必引入搜尋腳本：**
+> ```javascript
+> const { 搜尋, 搜尋餐點, 搜尋按鈕 } = require('./search.js');
+> ```
+
+### 2. Ref 動態變化
+> **每次頁面導航後，ref 都會重新編排！**
+
+| 情境 | 處理方式 |
+|------|----------|
+| 進入新頁面 | 先 snapshot |
+| 打開 Modal | 先 snapshot |
+| 不要硬編碼 ref | 從 snapshot 取得 |
+
+### 2. Snapshot 原則
+| 步驟 | 需要 Snapshot？ |
+|------|----------------|
+| Step 1 確認需求 | ❌ 不需要 |
+| Step 2 切換模式 | ❌ 不需要 |
+| Step 3 以後 | ✅ 都需要 |
+
+### 3. Snapshot 指令範本
+```javascript
+// 一般頁面（搜尋結果、列表）
+{ "action": "snapshot", "compact": true, "selector": "main", "limit": 30 }}
+
+// 菜單頁面（需要互動元素）
+{ "action": "snapshot", "compact": true, "selector": "main", "interactive": true, "limit": 50 }}
+
+// Modal / 彈窗
+{ "action": "snapshot", "compact": true }}
+```
+
+---
+
+## 📊 常用 Ref 速查表
 
 ### 首頁 (`/tw/feed`)
-- `e4` ~ `e8`: 核心導航（外送/自取/搜尋/購物車等）
-- `e27`, `e30`, `e33`...: 餐廳卡片（每間店 +3）
+| Ref | 元素 | 功能 |
+|-----|------|------|
+| `e4` | radio | 外送 |
+| `e5` | radio | 外帶 |
+| `e6` | link | 配送地址 |
+| `e7` | combobox | 搜尋框 |
+| `e8` | button | 購物車 |
 
-### 店家菜單頁 (`/tw/store/[店名]/[id]`)
-- `e1074`: 購物車
-- `e1109`: 店內搜尋
-- `e1135` ~ `e1162`: 菜單分類導航
-- `e1307` ~ `e2893`: 餐點項目（每個餐點 ref 遞增）
+### 配送地址對話框（打開 e6 後）
+| Ref | 元素 | 功能 |
+|-----|------|------|
+| `e821` | combobox | 地址輸入框 |
+| `e830` | button | 儲存按鈕 |
 
-### 購物車頁面 (待補充)
-- `e193`: 新增訂單備註 (待驗證)
-- `e194`: 前往結帳 (待驗證)
+### 店家頁
+| Ref | 元素 | 功能 |
+|-----|------|------|
+| `e1074` | button | 購物車 |
+| `e13~` | link | 菜單分類 |
+| `e31~` | link | 餐點項目 |
 
-### 客製化 Modal (待補充)
-- **加入購物車按鈕**: 動態 ref，需即時 snapshot
+### 購物車頁
+| Ref | 元素 | 功能 |
+|-----|------|------|
+| `e193` | button | 新增備註 |
+| `e194` | button | 前往結帳 |
 
 ---
 
-## ⚡ Snapshot 效率優化（重要！）
+## ⚡ 快速範例
 
-### 舊方法（抓整頁）
-```json
-{ "action": "snapshot", "compact": true }
-```
-
-### 新方法（只抓 main 區塊）
-```json
-// 搜尋結果 / 列表頁
-{ "action": "snapshot", "compact": true, "selector": "main", "limit": 30 }
-
-// 菜單頁（需要互動元素）
-{ "action": "snapshot", "compact": true, "selector": "main", "interactive": true, "limit": 50 }
-
-// 購物車頁面
-{ "action": "snapshot", "compact": true, "selector": "main", "limit": 30 }
-```
-
-### 參數說明
-| 參數 | 功能 |
-|------|------|
-| `selector: "main"` | 只抓取 &lt;main&gt; 區塊，跳過 header/footer |
-| `limit: 30/50` | 限制輸出行數，避免過大 |
-| `interactive: true` | 輸出易操作的元素列表（適合菜單頁） |
-
-### ⚠️ 重要原則
-- **Step 1-2**：不需要 snapshot（純對話+點擊）
-- **Step 3 以後**：才需要 snapshot 抓取內容
-
-### 快速回到首頁
-
-```json
+### 範例 1：搜尋珍珠奶茶
+```javascript
+// 1. 導航
 { "action": "navigate", "targetUrl": "https://www.ubereats.com/tw/feed" }
+
+// 2. 搜尋
+{ "action": "act", "request": { "kind": "click", "ref": "e7" }}
+{ "action": "act", "request": { "kind": "type", "ref": "e7", "text": "珍珠奶茶" }}
+
+// 3. 確認結果
+{ "action": "snapshot", "compact": true, "selector": "main", "limit": 30 }}
+
+// 4. 點擊餐廳（假設 ref=e30）
+{ "action": "act", "request": { "kind": "click", "ref": "e30" }}
 ```
 
-### 確認當前模式
-
-```json
-{ "action": "snapshot", "compact": true }
-```
-
-### 切換到外帶模式
-
-```json
-{ "action": "act", "request": {"kind": "click", "ref": "e5"} }
-```
-
-### 搜尋餐點
-
-```json
-{ "action": "act", "request": {"kind": "click", "ref": "e7"} }
-```
-
-### 查看購物車
-
-```json
-{ "action": "act", "request": {"kind": "click", "ref": "e1074"} }
-```
-
-*(註：首頁的購物車 ref 為 e8，店家頁的為 e1074)*
-
-### 進入結帳
-
-```json
-{ "action": "act", "request": {"kind": "click", "ref": "e194"} }
-```
-
-### 動態搜尋店家（通用流程）
-
+### 範例 2：加入購物車
 ```javascript
-// Step 1: 點擊搜尋框
-browser({ action: "act", request: { kind: "click", ref: "e7" }});
+// 1. 確認菜單
+{ "action": "snapshot", "compact": true, "selector": "main", "limit": 50 }}
 
-// Step 2: 輸入關鍵字（例如：珍珠奶茶、火鍋、早餐店）
-browser({ action: "act", request: { kind: "type", ref: "e7", text: "貢茶" }});
+// 2. 點擊餐點（假設 ref=e31）
+{ "action": "act", "request": { "kind": "click", "ref": "e31" }}
 
-// Step 3: 等待搜尋結果並 snapshot（優化版：只抓 main 區塊）
-browser({ action: "snapshot", compact: true, selector: "main", limit: 30 });
+// 3. 確認 modal
+{ "action": "snapshot", "compact": true }}
 
-// Step 4: 從 snapshot 找到目標店家的 ref 並點擊
-// 例如：e30 (貢茶 彰化鹿港店)
-browser({ action: "act", request: { kind: "click", ref: "e30" }});
+// 4. 加入購物車（假設 ref=e50）
+{ "action": "act", "request": { "kind": "click", "ref": "e50" }}
 ```
 
-### 加入餐點到購物車（通用流程）
-
+### 範例 3：結帳
 ```javascript
-// Step 1: 點擊餐點項目打開 modal
-browser({ action: "act", request: { kind: "click", ref: "e1651" }});
+// 1. 點擊購物車
+{ "action": "act", "request": { "kind": "click", "ref": "e1074" }}
 
-// Step 2: 立即 snapshot 抓取 modal 結構
-browser({ action: "snapshot", compact: true });
+// 2. 確認內容
+{ "action": "snapshot", "compact": true, "selector": "main", "limit": 30 }}
 
-// Step 3: 找到「新增至訂單」按鈕的 ref 並點擊
-// (ref 需從 snapshot 中動態取得，通常是 button "新增 X 項商品至訂單")
-browser({ action: "act", request: { kind: "click", ref: "[動態ref]" }});
+// 3. 結帳
+{ "action": "act", "request": { "kind": "click", "ref": "e194" }}
 ```
 
 ---
 
-## ⚠️ 注意事項與最佳實踐
-
-### Ref 動態性
-- **首頁的 ref 相對固定**（e4 ~ e8）
-- **店家頁的 ref 會變動**（取決於菜單長度和分類數量）
-- **Modal 內的 ref 是動態的**，必須在打開後立即 snapshot 取得
-
-### 建議操作流程
-1. **每次進入新頁面後都 snapshot**，確認當前可用的 refs
-2. **點擊餐點後立即 snapshot**，抓取 modal 內的按鈕 ref
-3. **不要硬編碼 ref**，從 snapshot 動態解析
-4. **保持 browser session**，避免重複登入
-
-### 常見錯誤處理
-- **Ref 失效**: 重新 snapshot 並更新 ref
-- **Modal 未出現**: 等待 1-2 秒後再 snapshot
-- **購物車數字不更新**: 重新載入頁面或 snapshot
-- **登入狀態遺失**: 使用 `target="host"` 保持 session
-
-### 效率優化
-- **批次操作**: 一次加入多個餐點後再進購物車
-- **減少 snapshot**: 只在必要時（換頁/打開 modal）才執行
-- **快取店家 URL**: 常用餐廳可直接用 URL 導航，跳過搜尋步驟
+## 📁 相關檔案
+- `search.js` - 搜尋輔助腳本（自動化找 ref）
 
 ---
 
-## 使用方式
+## ⚠️ 常見錯誤
 
-### 點餐格式
-
-當你說「我想吃OO」「幫我找吃的」「附近有什麼」之類的，就觸發此技能。
-
-### 搜尋附近餐廳
-
-1. **用戶給座標** → 用座標搜尋
-   - 例如：`24.056, 120.436` 或 `latitude: 24.056, longitude: 120.436`
-
-2. **用戶給地址** → 用地址搜尋
-   - 例如：鹿港、彰化、景福巷18號
-
-3. **無提供資訊** → 使用預設地址（景福巷18號）
-
-4. **搜尋後** → 立即執行 snapshot 擷取頁面：
-   ```bash
-   snapshot --selector "main" --interactive --limit 20
-   ```
-
-5. **輸出結果** → 按規格化格式呈現（ref、店家名、活動）
-
----
-
-## 常用餐廳
-
-### 得利牛排 鹿港店
-- **網址**：`https://www.ubereats.com/tw/store/得利牛排-鹿港店/jycNRkOQUd-qawr8CtycmQ`
-- **熱門**：嫩煎沙朗牛排及干貝 $350
-
-### HOME28咖哩 大隆店
-- **網址**：`https://www.ubereats.com/tw/store/home28咖哩-大隆店/Xx8UoC5yQ4ClvYj2O44Lyg`
-
-### 岩橙 豐饌湯鍋 鹿港店
-- **網址**：`https://www.ubereats.com/tw/store/岩橙-豐饌湯鍋-鹿港店/p-ckxm1qU7yF8O0pG_OygQ`
-
-### A-Nini 夏威夷輕食 鹿港店
-- **網址**：`https://www.ubereats.com/tw/store/a-nini-夏威夷輕食-鹿港店/rGF3Jv4ZWRK6RsZytf60Bw`
-
----
-
-## 瀏覽器 session
-
-### 瀏覽器啟動流程（重要！）
-當需要使用瀏覽器時，按照以下順序嘗試：
-
-1. **直接使用 OpenClaw 瀏覽器**：使用 `profile="openclaw"` 
-2. **如果瀏覽器未啟動**，嘗試啟動：
-   ```json
-   { "action": "start", "profile": "openclaw" }
-   ```
-3. **然後導航到 Uber Eats**：
-   ```json
-   { "action": "open", "profile": "openclaw", "targetUrl": "https://www.ubereats.com/tw/feed" }
-   ```
-
-### 預設使用 OpenClaw Browser
-- 使用 `profile="openclaw"` 或 `targetUrl` 直接操作
-- **不要**使用 `target="host"` 或 `profile="chrome"`
-- 保持登入狀態，不用每次重新登入
-
-### 瀏覽器已開啟
-- Uber Eats 訂單頁 + 餐點列表頁已開啟
-- Session 維持登入中
-
-### ⚠️ 不要顯示錯誤訊息
-- **直接使用 OpenClaw 瀏覽器** - 不需要詢問用戶如何處理
-- 如果瀏覽器服務未啟用，自動嘗試啟動瀏覽器
-
----
-
-## 常見問題
-
-### Q: 登入失敗？
-- 檢查瀏覽器是否保持開啟
-- 使用 Google 登入較穩定
-
-### Q: 找不到餐廳？
-- 嘗試調整搜尋範圍
-- 檢查座標是否正確
-
----
-
-## ⚠️ Lessons Learned（實戰經驗）
-
-### 🚨 問題：購物車彈窗（Modal）未正確檢測
-
-**問題描述**：
-- 用戶說「有 2 項商品在購物車」但 snapshot 顯示 0
-- 頁面上有彈窗（modal）顯示購物車內容，但 snapshot 沒有捕獲到
-
-**原因分析**：
-1. **瀏覽器連線不穩定** - OpenClaw 瀏覽器可能斷線重連，導致狀態不同步
-2. **不同瀏覽器 session** - OpenClaw 控制的瀏覽器和用戶看的是不同的 session
-3. **Snapshot 擷取不完整** - 彈窗內容可能未被包含在 snapshot 輸出中
-
-**解決方案**：
-1. **不要只依賴購物車數字判斷** - 用戶說有購物車內容時，要相信用戶的描述
-2. **嘗試點擊餐點** - 點擊後立即 snapshot，通常會打開彈窗
-3. **檢查 dialog 元素** - 使用較大的 `limit` 參數或不設 limit，讓 snapshot 輸出更多行
-4. **直接進行下單操作** - 即使 snapshot 顯示 0，用戶說有商品時就繼續結帳流程
-
-**實際案例**：
-```
-用戶：黑糖珍珠奶茶
-→ 點擊快速新增
-→ snapshot 顯示 0 項商品（但這是舊畫面）
-→ 用戶說：有一個 2 項商品至訂單的彈窗
-→ 說明瀏覽器狀態不同步，但訂單實際已加入
-→ 點擊「新增 2 項商品至訂單」按鈕
-→ 成功加入購物車
-```
-
-**關鍵原則**：
-- **信任用戶的描述** - 用戶說有彈窗就是有，不要堅持 snapshot 的結果
-- **嘗試點擊操作** - 直接進行預期操作，即使看起來像失敗
-- **檢查 dialog/modal** - 彈窗可能不在主要 snapshot 輸出中，需要擴大範圍
-
----
-
-## 🔍 每次都要使用模糊搜尋腳本
-
-**重要原則**：當用戶給出餐點名稱時，必須使用搜尋腳本來定位 ref，不能人工判斷！
-
-### 錯誤做法（我之前犯的錯）
-```javascript
-// ❌ 直接看 snapshot 輸出，人工找 ref
-// e31: 黑糖珍珠牛奶 $70
-// 然後猜測 ref 是 e31
-```
-
-### 正確做法
-```javascript
-// ✅ Step 1: 先 snapshot
-browser({ action: "snapshot", compact: true, selector: "main", limit: 30 });
-
-// Step 2: 使用搜尋腳本（由 OpenClaw 自動執行）
-const results = 搜尋餐點(snapshotOutput, '黑糖珍珠牛奶');
-// 回傳: [{ ref: 'e31', content: '黑糖珍珠牛奶 $70', ... }]
-
-// Step 3: 使用搜尋結果的 ref
-browser({ action: "act", request: { kind: "click", ref: results[0].ref }});
-```
-
-### 為什麼要用搜尋腳本？
-
-| 人工判斷 | 搜尋腳本 |
-|---------|---------|
-| ref 可能變化 | 動態抓取最新 ref |
-| 可能看錯 | 精準匹配 |
-| 浪費時間 | 自動化 |
-
-### 搜尋函數列表
-
-| 函數 | 用法 |
-|------|------|
-| `搜尋(snapshot, 關鍵字)` | 模糊搜尋任何元素 |
-| `搜尋餐點(snapshot, '餐點名')` | 精準搜餐點 |
-| `搜尋按鈕(snapshot, '按鈕名')` | 搜按鈕 |
-| `搜尋購物車(snapshot)` | 找購物車 |
-| `搜尋結帳(snapshot)` | 找結帳 |
-
-### 未來執行時
-
-**每次用戶說「我要OO」時**：
-1. 先 snapshot
-2. 用 `搜尋餐點(snapshot, '用戶說的餐點')` 找 ref
-3. 直接點擊該 ref
-
-不要人工看輸出猜 ref！
+| 錯誤 | 原因 | 解決 |
+|------|------|------|
+| Ref 無效 | 頁面變了 | 重新 snapshot |
+| 購物車數字不更新 | 不同步 | 直接進行操作 |
+| 找不到餐點 | ref 變了 | 用搜尋腳本 |

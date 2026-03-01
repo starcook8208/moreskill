@@ -1,182 +1,148 @@
 /**
- * Uber Eats 模糊搜尋腳本
- * 用法：搜尋(snapshot輸出, 關鍵字)
- * 回傳：符合關鍵字的 ref 列表
+ * Uber Eats 搜尋輔助腳本
+ * 用於自動化找 ref
  */
 
-// ============================================
-// 主要搜尋函數
-// ============================================
-
 /**
- * 在 snapshot 輸出中搜尋符合關鍵字的元素 ref
- * @param {string} snapshotOutput - browser snapshot 的輸出內容
+ * 模糊搜尋任何元素
+ * @param {Array} snapshot - snapshot 輸出陣列
  * @param {string} keyword - 搜尋關鍵字
- * @param {Object} options - 選項
- * @returns {Array} 符合的 ref 列表
+ * @returns {Array} 符合的結果
  */
-function 搜尋(snapshotOutput, keyword, options = {}) {
-    const {
-        嚴格 = false,      // true = 完全匹配, false = 模糊匹配
-        回傳類型 = 'all',  // 'all' | 'link' | 'button' | 'text'
-        大小寫 = false     // true = 區分大小寫
-    } = options;
-
-    if (!snapshotOutput || !keyword) {
-        return [];
-    }
-
-    const lines = snapshotOutput.split('\n');
-    const matches = [];
-
-    // 解析每一行，找符合的元素
-    lines.forEach((line, index) => {
-        const refMatch = line.match(/\[ref=([^\]]+)\]/);
-        const contentMatch = line.match(/- (.+)/);
-
-        if (!refMatch || !contentMatch) return;
-
-        const ref = refMatch[1];
-        const content = contentMatch[1];
-        const type = 取得類型(line);
-
-        // 判斷是否匹配關鍵字
-        const 搜尋目標 = 大小寫 ? content : content.toLowerCase();
-        const 關鍵字 = 大小寫 ? keyword : keyword.toLowerCase();
-
-        let 是否匹配;
-        if (嚴格) {
-            是否匹配 = 搜尋目標.includes(關鍵字);
-        } else {
-            // 模糊匹配：關鍵字包含在內容中即可
-            是否匹配 = 搜尋目標.includes(關鍵字);
-        }
-
-        // 過濾類型
-        if (回傳類型 !== 'all' && 回傳類型 !== type) {
-            是否匹配 = false;
-        }
-
-        if (是否匹配) {
-            matches.push({
-                ref,
-                content: content.trim(),
-                type,
-                line: index + 1
-            });
-        }
-    });
-
-    return matches;
-}
-
-// ============================================
-// 輔助函數
-// ============================================
-
-/**
- * 從行內容判斷元素類型
- */
-function 取得類型(line) {
-    if (line.includes('- link')) return 'link';
-    if (line.includes('- button')) return 'button';
-    if (line.includes('- textbox')) return 'textbox';
-    if (line.includes('- radio')) return 'radio';
-    if (line.includes('- checkbox')) return 'checkbox';
-    if (line.includes('- heading')) return 'heading';
-    if (line.includes('- text')) return 'text';
-    return 'other';
+function 搜尋(snapshot, keyword) {
+  const lowerKeyword = keyword.toLowerCase();
+  return snapshot.filter(item => 
+    item.content && item.content.toLowerCase().includes(lowerKeyword)
+  );
 }
 
 /**
- * 取得所有 ref（快速建立索引用）
+ * 搜尋餐點（精準匹配）
+ * @param {Array} snapshot - snapshot 輸出陣列
+ * @param {string} dishName - 餐點名稱
+ * @returns {Array} 符合的結果
  */
-function 取得所有Ref(snapshotOutput) {
-    const lines = snapshotOutput.split('\n');
-    const refs = [];
-
-    lines.forEach((line) => {
-        const refMatch = line.match(/\[ref=([^\]]+)\]/);
-        if (refMatch) {
-            refs.push(refMatch[1]);
-        }
-    });
-
-    return refs;
-}
-
-// ============================================
-// 快速搜尋捷徑
-// ============================================
-
-/**
- * 搜尋餐點
- */
-function 搜尋餐點(snapshotOutput, 餐點名稱) {
-    return 搜尋(snapshotOutput, 餐點名稱, { 回傳類型: 'link' });
+function 搜尋餐點(snapshot, dishName) {
+  const lowerName = dishName.toLowerCase();
+  return snapshot.filter(item => 
+    item.type === 'link' && 
+    item.content && 
+    item.content.toLowerCase().includes(lowerName)
+  );
 }
 
 /**
  * 搜尋按鈕
+ * @param {Array} snapshot - snapshot 輸出陣列
+ * @param {string} buttonName - 按鈕名稱
+ * @returns {Array} 符合的結果
  */
-function 搜尋按鈕(snapshotOutput, 按鈕名稱) {
-    return 搜尋(snapshotOutput, 按鈕名稱, { 回傳類型: 'button' });
+function 搜尋按鈕(snapshot, buttonName) {
+  const lowerName = buttonName.toLowerCase();
+  return snapshot.filter(item => 
+    item.type === 'button' && 
+    item.content && 
+    item.content.toLowerCase().includes(lowerName)
+  );
 }
 
 /**
- * 搜尋結帳相關
+ * 搜尋購物車按鈕
+ * @param {Array} snapshot - snapshot 輸出陣列
+ * @returns {Object} 購物車 ref
  */
-function 搜尋結帳(snapshotOutput) {
-    return 搜尋(snapshotOutput, '結帳');
+function 搜尋購物車(snapshot) {
+  const results = 搜尋(snapshot, '購物車');
+  return results.length > 0 ? results[0] : null;
 }
 
 /**
- * 搜尋購物車
+ * 搜尋結帳按鈕
+ * @param {Array} snapshot - snapshot 輸出陣列
+ * @returns {Object} 結帳 ref
  */
-function 搜尋購物車(snapshotOutput) {
-    return 搜尋(snapshotOutput, '購物車');
+function 搜尋結帳(snapshot) {
+  const results = 搜尋(snapshot, '結帳');
+  return results.length > 0 ? results[0] : null;
 }
 
 /**
- * 搜尋快速新增
+ * 搜尋快速新增按鈕
+ * @param {Array} snapshot - snapshot 輸出陣列
+ * @returns {Array} 快速新增按鈕列表
  */
-function 搜尋快速新增(snapshotOutput) {
-    return 搜尋(snapshotOutput, '快速新增', { 回傳類型: 'button' });
+function 搜尋快速新增(snapshot) {
+  return 搜尋(snapshot, '快速新增');
 }
 
-// ============================================
-// 使用範例
-// ============================================
+/**
+ * 搜尋分類
+ * @param {Array} snapshot - snapshot 輸出陣列
+ * @param {string} categoryName - 分類名稱
+ * @returns {Array} 分類結果
+ */
+function 搜尋分類(snapshot, categoryName) {
+  const lowerName = categoryName.toLowerCase();
+  return snapshot.filter(item => 
+    item.type === 'link' && 
+    item.content && 
+    item.content.toLowerCase().includes(lowerName)
+  );
+}
 
-/*
-// 範例 1: 基本搜尋
-const results = 搜尋(snapshotOutput, '醋肉');
-console.log(results);
-// 回傳: [
-//   { ref: 'e20', content: '小份醋肉 $63', type: 'link', line: 10 },
-//   { ref: 'e34', content: '小份醋肉 $63 ...', type: 'link', line: 34 },
-//   ...
-// ]
-
-// 範例 2: 搜尋按鈕
-const buttons = 搜尋按鈕(snapshotOutput, '新增');
-console.log(buttons);
-
-// 範例 3: 搜尋購物車
-const cart = 搜尋購物車(snapshotOutput);
-console.log(cart);
-// 回傳: [{ ref: 'e6', content: '0 台購物車', type: 'button', line: 5 }]
-
-// 範例 4: 取得第一個符合的 ref
-const firstRef = 搜尋(snapshotOutput, '結帳')[0]?.ref;
-*/
-
+// 匯出函數
 module.exports = {
-    搜尋,
-    搜尋餐點,
-    搜尋按鈕,
-    搜尋結帳,
-    搜尋購物車,
-    搜尋快速新增,
-    取得所有Ref
+  搜尋,
+  搜尋餐點,
+  搜尋按鈕,
+  搜尋購物車,
+  搜尋結帳,
+  搜尋快速新增,
+  搜尋分類,
+  搜尋輸入框,
+  搜尋已儲存地址
 };
+
+/**
+ * 搜尋輸入框（最常用於地址變更）
+ * @param {Array} snapshot - snapshot 輸出陣列
+ * @param {string} inputName - 輸入框名稱（可選）
+ * @returns {Array} 輸入框列表
+ */
+function 搜尋輸入框(snapshot, inputName) {
+  if (inputName) {
+    const lowerName = inputName.toLowerCase();
+    return snapshot.filter(item => 
+      item.type === 'combobox' && 
+      item.content && 
+      item.content.toLowerCase().includes(lowerName)
+    );
+  }
+  // 沒給名稱就回傳所有 combobox
+  return snapshot.filter(item => item.type === 'combobox');
+}
+
+/**
+ * 搜尋已儲存的地址
+ * @param {Array} snapshot - snapshot 輸出陣列
+ * @param {string} addressName - 地址名稱（可選）
+ * @returns {Array} 地址列表
+ */
+function 搜尋已儲存地址(snapshot, addressName) {
+  // 先找已儲存的地址區塊
+  if (addressName) {
+    const lowerName = addressName.toLowerCase();
+    return snapshot.filter(item => 
+      item.type === 'button' && 
+      item.content && 
+      item.content.toLowerCase().includes(lowerName)
+    );
+  }
+  // 回傳所有 button 類型的地址
+  return snapshot.filter(item => 
+    item.type === 'button' && 
+    item.content &&
+    !item.content.includes('編輯') &&
+    !item.content.includes('新增')
+  );
+}
